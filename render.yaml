@@ -1,0 +1,12 @@
+# Render Blueprint: New > Blueprint > pick this repo. Free plan is fine (cold start after idle).
+services:
+  - type: web
+    name: oot-cleanroom-chromebook
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: python ports/soh/render_proxy/server.py
+    healthCheckPath: /healthz
+    envVars:
+      - key: UPSTREAM
+        value: https://andrewnakas.github.io/oot-cleanroom
