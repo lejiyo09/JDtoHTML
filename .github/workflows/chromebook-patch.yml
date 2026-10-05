@@ -1,0 +1,52 @@
+# Keeps the published site's index.html carrying the Chromebook layer (ports/soh/chromebook.js),
+# without rebuilding the engine. Safe to re-run: patch_index.py is idempotent.
+#
+# Runs when:
+#  - someone pushes a fresh build to the Pages branch (a rebuild replaces index.html and drops the patch)
+#  - anything is pushed to main (the tools are read from there; a no-op when already patched)
+#  - started by hand (Actions tab > Run workflow)
+#
+# Set PAGES_BRANCH if the site is not served from gh-pages.
+name: chromebook-patch
+
+on:
+  push:
+    branches: [gh-pages, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chromebook-patch
+  cancel-in-progress: false
+
+env:
+  PAGES_BRANCH: gh-pages
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tools (default branch)
+        uses: actions/checkout@v4
+        with:
+          path: tools
+          sparse-checkout: ports/soh
+      - name: Site (Pages branch)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PAGES_BRANCH }}
+          path: site
+      - name: Patch index.html
+        run: |
+          test -f site/index.html || { echo "no index.html on $PAGES_BRANCH"; exit 1; }
+          python3 tools/ports/soh/patch_index.py site/index.html
+      - name: Commit and push if changed
+        working-directory: site
+        run: |
+          if git diff --quiet; then echo "nothing to do"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Site: add Chromebook layer (workflow)"
+          git push origin "HEAD:$PAGES_BRANCH"
