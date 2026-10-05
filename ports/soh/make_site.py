@@ -29,6 +29,11 @@ def main(argv):
             "<script>if(!location.hash||location.hash.length<2){history.replaceState(null,'',"
             "location.pathname+location.search+'#soh=soh.o2r%3Fv%3D" + ver + "&oot=oot.o2r%3Fv%3D" + ver + "');}</script>")
     html = html.replace("<head>", "<head>" + boot, 1)
+    # Chromebook/ChromeOS support: capability check, low-spec profile, Tab = menu, fullscreen
+    cb = open(os.path.join(HERE, "chromebook.js"), encoding="utf-8").read()
+    html = html.replace("</head>", "<script>" + cb + "</script></head>", 1)
+    if '<meta name="viewport"' not in html:
+        html = html.replace("<head>", '<head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">', 1)
     html = re.sub(r"<title>[^<]*</title>", "<title>Ocarina of Time Clean Room</title>", html)
     html = html.replace("<h1>Ship of Harkinian</h1>", "<h1>Ocarina of Time &mdash; Clean Room</h1>")
     html = html.replace("WebAssembly Port", "Ship of Harkinian web build &middot; every ROM asset regenerated")
