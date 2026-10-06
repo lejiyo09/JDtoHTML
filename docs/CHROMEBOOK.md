@@ -37,3 +37,4 @@ Low-spec mode uses `gMSAAValue` and `gAdvancedResolution.*` CVars; if the fork n
 아래쪽 "마우스 시점" 버튼을 켜면 마우스 움직임이 가상 게임패드의 오른쪽 스틱 입력이 됩니다 (`window._crMouseLook`).
 켠 뒤 게임 화면을 클릭하면 마우스가 고정되고 Esc로 풀립니다. 카메라가 오른쪽 스틱을 받도록 게임 메뉴(Tab)에서 Free Look을 켜야 합니다.
 검증: 가짜 게임패드 생성, 마우스 이동 → 축 값, 정지 시 0 복귀, 끄면 제거까지 시험 페이지에서 확인. 실제 게임에서의 카메라 동작은 **미확인**.
+마우스 설정(⚙ 버튼): 감도 1~20 (기본 6), 상하 반전. 이 브라우저(localStorage `cr-mouselook`)에 저장됩니다.

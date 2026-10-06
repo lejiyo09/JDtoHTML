@@ -25,7 +25,13 @@
 
   // ---- Mouse look (experimental, off by default): the mouse drives a virtual gamepad's right stick.
   // Needs a camera that listens to the right stick (turn on Free Look in the game menu).
-  var ML = { on: false, pad: null, dx: 0, dy: 0, rx: 0, ry: 0, gain: 0.06, onChange: null };
+  var ML = { on: false, pad: null, dx: 0, dy: 0, rx: 0, ry: 0, sens: 6, invY: false, onChange: null };
+  try {
+    var _sv = JSON.parse(localStorage.getItem('cr-mouselook') || '{}');
+    if (_sv.sens >= 1 && _sv.sens <= 20) ML.sens = _sv.sens;
+    ML.invY = !!_sv.invY;
+  } catch (e) {}
+  ML.save = function () { try { localStorage.setItem('cr-mouselook', JSON.stringify({ sens: ML.sens, invY: ML.invY })); } catch (e) {} };
   window._crMouseLook = ML;
   (function () {
     var orig = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : function () { return []; };
@@ -58,8 +64,8 @@
     function tick() {
       if (ML.on && ML.pad) {
         // the stick follows how far the mouse moved this frame, then eases back to centre
-        ML.rx = clamp(ML.rx * 0.4 + ML.dx * ML.gain * 0.6);
-        ML.ry = clamp(ML.ry * 0.4 + ML.dy * ML.gain * 0.6);
+        ML.rx = clamp(ML.rx * 0.4 + ML.dx * (ML.sens / 100) * 0.6);
+        ML.ry = clamp(ML.ry * 0.4 + ML.dy * (ML.sens / 100) * 0.6 * (ML.invY ? -1 : 1));
         ML.dx = 0; ML.dy = 0;
         ML.pad.axes = [0, 0, Math.abs(ML.rx) < 0.02 ? 0 : ML.rx, Math.abs(ML.ry) < 0.02 ? 0 : ML.ry];
         ML.pad.timestamp = performance.now();
@@ -215,7 +221,7 @@
 
       '<h3>마우스 시점 (실험 기능)</h3>' +
       '<p>아래쪽 <b>마우스 시점</b> 버튼을 켜고 게임 화면을 클릭하면 마우스가 고정되고, 마우스를 움직이는 대로 오른쪽 스틱(카메라) 입력이 들어갑니다. ' +
-      '<b>Esc</b>로 마우스를 풀 수 있습니다. 게임 설정 메뉴(<b>Tab</b>)에서 <b>자유 시점(Free Look)</b>을 켜야 카메라가 움직입니다. ' +
+      '<b>Esc</b>로 마우스를 풀 수 있습니다. <b>마우스 설정</b> 버튼에서 감도(1~20)와 상하 반전을 바꿀 수 있고 이 브라우저에 저장됩니다. 게임 설정 메뉴(<b>Tab</b>)에서 <b>자유 시점(Free Look)</b>을 켜야 카메라가 움직입니다. ' +
       '게임패드를 쓰는 경우 이 기능은 꺼 두세요.</p>' +
 
       '<h3>3. 저장</h3>' +
@@ -266,6 +272,32 @@
     mlBtn.addEventListener('click', function () { window._crMouseLook.set(!window._crMouseLook.on); mlBtn.blur(); });
     mlLabel();
     bar.insertBefore(mlBtn, fsBtn);
+    var ML = window._crMouseLook;
+
+    // ---- mouse settings popover (sensitivity, invert Y)
+    var setBtn = document.createElement('button');
+    setBtn.textContent = '⚙ 마우스 설정';
+    setBtn.style.cssText = fsBtn.style.cssText;
+    var pop = document.createElement('div');
+    pop.style.cssText = 'position:fixed;bottom:44px;left:50%;transform:translateX(-50%);z-index:103;display:none;' +
+      'width:280px;max-width:92vw;box-sizing:border-box;padding:12px 14px;border:1px solid #556;border-radius:10px;' +
+      'background:rgba(20,20,30,.96);color:#dde;font:14px/1.5 sans-serif';
+    pop.innerHTML = '<div style="font-weight:bold;margin-bottom:6px">마우스 시점 설정</div>' +
+      '<label style="display:block">감도: <b id="cr-sens-v"></b> <span style="color:#9ab">(1 느림 ~ 20 빠름)</span>' +
+      '<input id="cr-sens" type="range" min="1" max="20" step="1" style="width:100%"></label>' +
+      '<label style="display:block;margin-top:8px"><input id="cr-invy" type="checkbox"> 상하 반전 (마우스를 위로 올리면 아래를 봄)</label>' +
+      '<div style="margin-top:10px;text-align:right"><button id="cr-set-reset" style="padding:4px 10px;margin-right:6px;border:1px solid #778;border-radius:6px;background:#2a2a3c;color:#eef;cursor:pointer">초기화</button>' +
+      '<button id="cr-set-close" style="padding:4px 14px;border:1px solid #778;border-radius:6px;background:#2a2a3c;color:#eef;cursor:pointer">닫기</button></div>';
+    document.body.appendChild(pop);
+    var sensIn = pop.querySelector('#cr-sens'), sensV = pop.querySelector('#cr-sens-v'), invIn = pop.querySelector('#cr-invy');
+    function popSync() { sensIn.value = ML.sens; sensV.textContent = ML.sens; invIn.checked = ML.invY; }
+    sensIn.addEventListener('input', function () { ML.sens = +sensIn.value; sensV.textContent = ML.sens; ML.save(); });
+    invIn.addEventListener('change', function () { ML.invY = invIn.checked; ML.save(); });
+    pop.querySelector('#cr-set-reset').addEventListener('click', function () { ML.sens = 6; ML.invY = false; ML.save(); popSync(); });
+    function popShow(on) { pop.style.display = on ? 'block' : 'none'; if (on) popSync(); }
+    pop.querySelector('#cr-set-close').addEventListener('click', function () { popShow(false); });
+    setBtn.addEventListener('click', function () { popShow(pop.style.display === 'none'); setBtn.blur(); });
+    bar.insertBefore(setBtn, fsBtn);
     panel.addEventListener('click', function (e) { if (e.target === panel || e.target.id === 'cr-help-close') helpShow(false); });
     window.addEventListener('keydown', function (e) {
       if (panel.style.display !== 'none') { e.stopPropagation(); if (e.code === 'Escape' || e.code === 'Tab') { e.preventDefault(); helpShow(false); } }
