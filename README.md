@@ -10,6 +10,8 @@ samples, prerendered backgrounds. No ROM is needed to play.
 Controls: `W A S D` stick · `X` A · `C` B · `Z` Z · `Space` Start · arrow keys C buttons · `T F G H` D-pad ·
 `Esc` SoH menu · gamepads work. Saves stay in the browser.
 
+**Chromebook:** works in ChromeOS Chrome (low-spec mode, Tab = menu, fullscreen button); see [docs/CHROMEBOOK.md](docs/CHROMEBOOK.md).
+
 ## What is kept, what is generated
 
 The game reads its data from `oot.o2r`, the archive SoH normally extracts from your ROM. This project
