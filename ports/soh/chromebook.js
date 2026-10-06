@@ -5,7 +5,8 @@
 //  3. Esc on ChromeOS leaves fullscreen: Tab also opens the SoH menu, and in fullscreen the
 //     Keyboard Lock API hands Esc to the game (hold Esc to leave fullscreen)
 //  4. fullscreen button (F11 / the Chromebook fullscreen key work too)
-//  5. Korean help panel (controls, saving, performance, troubleshooting)
+//  5. mouse look (experimental): mouse -> virtual gamepad right stick
+//  6. Korean help panel (controls, saving, performance, troubleshooting)
 (function () {
   var qs = new URLSearchParams(location.search);
   var ua = navigator.userAgent || '';
@@ -20,6 +21,78 @@
     var extra = 'gMSAAValue:1,gAdvancedResolution.Enabled:1,gAdvancedResolution.VerticalPixelCount:480';
     window._devCvars = (window._devCvars ? window._devCvars + ',' : '') + extra;
   }
+
+
+  // ---- Mouse look (experimental, off by default): the mouse drives a virtual gamepad's right stick.
+  // Needs a camera that listens to the right stick (turn on Free Look in the game menu).
+  var ML = { on: false, pad: null, dx: 0, dy: 0, rx: 0, ry: 0, gain: 0.06, onChange: null };
+  window._crMouseLook = ML;
+  (function () {
+    var orig = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : function () { return []; };
+    function mkButtons() {
+      var b = [];
+      for (var i = 0; i < 17; i++) b.push({ pressed: false, touched: false, value: 0 });
+      return b;
+    }
+    function makePad(index) {
+      return { id: 'Mouse Look (STANDARD GAMEPAD Vendor: 0000 Product: 0000)', index: index, connected: true,
+               mapping: 'standard', axes: [0, 0, 0, 0], buttons: mkButtons(), timestamp: 0,
+               hapticActuators: [], vibrationActuator: null };
+    }
+    navigator.getGamepads = function () {
+      var real = Array.prototype.slice.call(orig() || []);
+      if (!ML.on) return real;
+      var slot = -1;
+      for (var i = 0; i < real.length; i++) if (!real[i]) { slot = i; break; }
+      if (slot < 0) slot = real.length;
+      if (!ML.pad || ML.pad.index !== slot) ML.pad = makePad(slot);
+      real[slot] = ML.pad;
+      return real;
+    };
+    function padEvent(type, pad) {      // GamepadEvent rejects a synthetic pad; a plain Event carrying .gamepad is what handlers read
+      var ev;
+      try { ev = new GamepadEvent(type, { gamepad: pad }); } catch (e) { ev = new Event(type); ev.gamepad = pad; }
+      window.dispatchEvent(ev);
+    }
+    function clamp(v) { return Math.max(-1, Math.min(1, v)); }
+    function tick() {
+      if (ML.on && ML.pad) {
+        // the stick follows how far the mouse moved this frame, then eases back to centre
+        ML.rx = clamp(ML.rx * 0.4 + ML.dx * ML.gain * 0.6);
+        ML.ry = clamp(ML.ry * 0.4 + ML.dy * ML.gain * 0.6);
+        ML.dx = 0; ML.dy = 0;
+        ML.pad.axes = [0, 0, Math.abs(ML.rx) < 0.02 ? 0 : ML.rx, Math.abs(ML.ry) < 0.02 ? 0 : ML.ry];
+        ML.pad.timestamp = performance.now();
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+    document.addEventListener('mousemove', function (e) {
+      if (!ML.on || document.pointerLockElement == null) return;
+      ML.dx += e.movementX || 0; ML.dy += e.movementY || 0;
+    }, true);
+    ML.set = function (on) {
+      if (on === ML.on) return;
+      ML.on = on;
+      if (on) {
+        ML.pad = null; navigator.getGamepads();
+        var pad = ML.pad;
+        try { if (pad) padEvent('gamepadconnected', pad); } catch (e) {}
+      } else {
+        var old = ML.pad; ML.pad = null; ML.rx = ML.ry = ML.dx = ML.dy = 0;
+        try { if (old) { old.connected = false; padEvent('gamepaddisconnected', old); } } catch (e) {}
+        if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+      }
+      if (ML.onChange) ML.onChange();
+    };
+    // while on, a click on the game captures the mouse (Esc releases it)
+    document.addEventListener('mousedown', function (e) {
+      if (!ML.on || document.pointerLockElement) return;
+      var t = e.target;
+      if (!t || t.tagName !== 'CANVAS') return;
+      try { var r = t.requestPointerLock && t.requestPointerLock(); if (r && r.catch) r.catch(function () {}); } catch (x) {}
+    }, true);
+  })();
 
   function webgl2ok() {
     try { return !!document.createElement('canvas').getContext('webgl2'); } catch (e) { return false; }
@@ -140,6 +213,11 @@
       '</table>' +
       '<p style="margin:6px 0 0">USB/블루투스 <b>게임패드</b>도 연결만 하면 자동으로 인식됩니다. 버튼을 한 번 눌러 보세요.</p>' +
 
+      '<h3>마우스 시점 (실험 기능)</h3>' +
+      '<p>아래쪽 <b>마우스 시점</b> 버튼을 켜고 게임 화면을 클릭하면 마우스가 고정되고, 마우스를 움직이는 대로 오른쪽 스틱(카메라) 입력이 들어갑니다. ' +
+      '<b>Esc</b>로 마우스를 풀 수 있습니다. 게임 설정 메뉴(<b>Tab</b>)에서 <b>자유 시점(Free Look)</b>을 켜야 카메라가 움직입니다. ' +
+      '게임패드를 쓰는 경우 이 기능은 꺼 두세요.</p>' +
+
       '<h3>3. 저장</h3>' +
       '<p>게임 안의 저장(올빼미 상, 메뉴의 저장)은 <b>이 브라우저 안</b>에 기록됩니다. ' +
       '<b>시크릿 모드</b>를 쓰거나 "사이트 데이터/쿠키 삭제"를 하면 저장이 사라지고, 다른 기기와 공유되지 않습니다. ' +
@@ -178,6 +256,16 @@
     helpBtn.style.cssText = fsBtn.style.cssText;
     helpBtn.addEventListener('click', function () { helpShow(true); });
     bar.insertBefore(helpBtn, fsBtn);
+
+    // ---- mouse-look toggle (bottom bar)
+    var mlBtn = document.createElement('button');
+    mlBtn.style.cssText = fsBtn.style.cssText;
+    function mlLabel() { mlBtn.textContent = '🖱 마우스 시점: ' + (window._crMouseLook.on ? '켜짐' : '꺼짐'); mlBtn.style.borderColor = window._crMouseLook.on ? '#fc6' : '#556'; }
+    mlBtn.title = '마우스로 카메라(오른쪽 스틱) 조작. 켠 뒤 게임 화면을 클릭하면 마우스가 고정됩니다 (Esc로 해제).';
+    window._crMouseLook.onChange = mlLabel;
+    mlBtn.addEventListener('click', function () { window._crMouseLook.set(!window._crMouseLook.on); mlBtn.blur(); });
+    mlLabel();
+    bar.insertBefore(mlBtn, fsBtn);
     panel.addEventListener('click', function (e) { if (e.target === panel || e.target.id === 'cr-help-close') helpShow(false); });
     window.addEventListener('keydown', function (e) {
       if (panel.style.display !== 'none') { e.stopPropagation(); if (e.code === 'Escape' || e.code === 'Tab') { e.preventDefault(); helpShow(false); } }
