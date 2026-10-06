@@ -51,7 +51,7 @@
     var fsBtn = document.createElement('button');
     fsBtn.textContent = '\u26F6 전체화면';
     fsBtn.title = '전체화면 (전체화면에서는 Esc를 길게 눌러 나갑니다)';
-    fsBtn.style.cssText = 'position:fixed;top:8px;right:8px;z-index:102;padding:6px 10px;border:1px solid #556;' +
+    fsBtn.style.cssText = 'padding:5px 10px;border:1px solid #556;' +
       'border-radius:6px;background:rgba(20,20,30,.75);color:#cde;font:13px sans-serif;cursor:pointer';
     fsBtn.addEventListener('click', function () {
       var el = document.documentElement;
@@ -59,7 +59,11 @@
       var p = el.requestFullscreen && el.requestFullscreen();
       if (p && p.catch) p.catch(function () {});
     });
-    document.body.appendChild(fsBtn);
+    // bottom centre: the game's own touch buttons (L, START, ESC, stick, A/B...) use the corners and the top edge
+    var bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:102;display:flex;gap:8px;opacity:.75';
+    bar.appendChild(fsBtn);
+    document.body.appendChild(bar);
 
     function lockKeys() {
       try {
@@ -73,23 +77,45 @@
     }
     document.addEventListener('fullscreenchange', lockKeys);
 
-    // Tab -> Escape (SoH menu). ChromeOS keeps Esc for leaving fullscreen.
-    var synth = false;
-    window.addEventListener('keydown', function (e) {
-      if (synth || e.code !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
-      var t = e.target;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-      e.preventDefault(); e.stopPropagation();
-      if (e.repeat) return;
+    // Extra keys that act as other keys (the game's default map is WASD + X/C/Z, which reads oddly:
+    // the key labelled "A" is "stick left"). Enter/J = A button (X), K/Backspace = B button (C), Tab = menu (Esc).
+    var ALIAS = {
+      Tab:       { key: 'Escape', code: 'Escape', keyCode: 27 },
+      Enter:     { key: 'x', code: 'KeyX', keyCode: 88 },
+      KeyJ:      { key: 'x', code: 'KeyX', keyCode: 88 },
+      KeyK:      { key: 'c', code: 'KeyC', keyCode: 67 },
+      Backspace: { key: 'c', code: 'KeyC', keyCode: 67 }
+    };
+    var synth = false, held = {};
+    function aliasEvent(type, a) {
+      var ev = new KeyboardEvent(type, { key: a.key, code: a.code, keyCode: a.keyCode, which: a.keyCode, bubbles: true, cancelable: true });
       synth = true;
-      var init = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
-      var dn = new KeyboardEvent('keydown', init);
-      var up = new KeyboardEvent('keyup', init);
-      (document.activeElement || document.body).dispatchEvent(dn);
-      setTimeout(function () { (document.activeElement || document.body).dispatchEvent(up); synth = false; }, 60);
+      try { (document.activeElement || document.body).dispatchEvent(ev); } finally { synth = false; }
+    }
+    function aliasFor(e) {
+      var a = ALIAS[e.code];
+      if (!a || synth || e.ctrlKey || e.altKey || e.metaKey) return null;
+      var t = e.target;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return null;   // typing a name: leave the keys alone
+      return a;
+    }
+    window.addEventListener('keydown', function (e) {
+      var a = aliasFor(e);
+      if (!a) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.repeat || held[e.code]) return;
+      held[e.code] = true;
+      aliasEvent('keydown', a);
+    }, true);
+    window.addEventListener('keyup', function (e) {
+      var a = ALIAS[e.code];
+      if (!a || synth || !held[e.code]) return;
+      e.preventDefault(); e.stopPropagation();
+      held[e.code] = false;
+      aliasEvent('keyup', a);
     }, true);
 
-    // ---- 한국어 도움말 (오른쪽 위 "도움말" 버튼)
+    // ---- 한국어 도움말 (아래쪽 "도움말" 버튼)
     var HELP = '' +
       '<h2 style="margin:0 0 4px">젤다의 전설: 시간의 오카리나 (웹 버전)</h2>' +
       '<p style="margin:0 0 12px;color:#9ab">ROM 없이 브라우저에서 바로 실행됩니다. 설치할 것이 없습니다.</p>' +
@@ -103,8 +129,9 @@
       '<h3>2. 조작법 (키보드)</h3>' +
       '<table style="border-collapse:collapse;width:100%">' +
       '<tr><td><b>W A S D</b></td><td>이동 (아날로그 스틱)</td></tr>' +
-      '<tr><td><b>X</b></td><td>A 버튼 (확인, 말 걸기, 구르기)</td></tr>' +
-      '<tr><td><b>C</b></td><td>B 버튼 (칼 휘두르기, 취소)</td></tr>' +
+      '<tr><td><b>X</b> 또는 <b>Enter</b>, <b>J</b></td><td>A 버튼 (확인, 말 걸기, 구르기)</td></tr>' +
+      '<tr><td><b>C</b> 또는 <b>K</b>, <b>Backspace</b></td><td>B 버튼 (칼 휘두르기, 취소)</td></tr>' +
+      '<tr><td colspan="2" style="color:#fc6">※ 키보드의 <b>A</b> 키는 게임의 A 버튼이 아니라 "왼쪽 이동"입니다. 확인은 <b>Enter</b> 또는 <b>X</b>를 쓰세요.</td></tr>' +
       '<tr><td><b>Z</b></td><td>Z 버튼 (적 조준 고정, 방패)</td></tr>' +
       '<tr><td><b>Space</b></td><td>Start (일시정지, 인벤토리)</td></tr>' +
       '<tr><td><b>방향키 ← ↑ → ↓</b></td><td>C 버튼 (아이템 사용)</td></tr>' +
@@ -122,7 +149,7 @@
       '<ul><li>램 4GB 이하 기기는 <b>저사양 모드</b>(해상도 낮춤, 계단 보정 끔)가 자동으로 켜집니다. 수동으로 바꾸려면 주소 끝에 ' +
       '<code>?q=low</code>(저사양) 또는 <code>?q=high</code>(고화질)를 붙이세요.</li>' +
       '<li>다른 탭과 앱을 닫고, 충전기를 연결하세요. 배터리 절약 모드가 켜져 있으면 느려집니다.</li>' +
-      '<li>오른쪽 위 <b>전체화면</b> 버튼을 쓰면 조금 더 부드럽습니다. 전체화면에서 나올 때는 <b>Esc를 길게</b> 누르세요.</li></ul>' +
+      '<li>아래쪽 <b>전체화면</b> 버튼을 쓰면 조금 더 부드럽습니다. 전체화면에서 나올 때는 <b>Esc를 길게</b> 누르세요.</li></ul>' +
 
       '<h3>5. 문제 해결</h3>' +
       '<ul><li><b>화면이 계속 검거나 멈춤:</b> 2~3분 기다린 뒤 <b>F5</b>(새로고침 키)를 눌러 보세요.</li>' +
@@ -148,9 +175,9 @@
     function helpShow(on) { panel.style.display = on ? 'flex' : 'none'; if (!on) { try { window.focus(); } catch (e) {} } }
     var helpBtn = document.createElement('button');
     helpBtn.textContent = '❓ 도움말';
-    helpBtn.style.cssText = fsBtn.style.cssText.replace('right:8px', 'right:104px');
+    helpBtn.style.cssText = fsBtn.style.cssText;
     helpBtn.addEventListener('click', function () { helpShow(true); });
-    document.body.appendChild(helpBtn);
+    bar.insertBefore(helpBtn, fsBtn);
     panel.addEventListener('click', function (e) { if (e.target === panel || e.target.id === 'cr-help-close') helpShow(false); });
     window.addEventListener('keydown', function (e) {
       if (panel.style.display !== 'none') { e.stopPropagation(); if (e.code === 'Escape' || e.code === 'Tab') { e.preventDefault(); helpShow(false); } }
@@ -162,8 +189,8 @@
     try { seen = localStorage.getItem('cr-help-seen') === '1'; } catch (e) {}
     if (!seen) {
       var tip = document.createElement('div');
-      tip.textContent = '처음이신가요? 오른쪽 위 ❓ 도움말에서 조작법을 확인하세요.';
-      tip.style.cssText = 'position:fixed;top:48px;right:8px;z-index:102;max-width:260px;padding:8px 12px;border-radius:8px;' +
+      tip.textContent = '처음이신가요? 아래쪽 ❓ 도움말에서 조작법을 확인하세요.';
+      tip.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:102;max-width:300px;text-align:center;padding:8px 12px;border-radius:8px;' +
         'background:#fc6;color:#222;font:14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.5)';
       document.body.appendChild(tip);
       setTimeout(function () { tip.remove(); }, 7000);
@@ -175,7 +202,7 @@
     if (info && !info.dataset.cb) {
       info.dataset.cb = '1';
       info.insertAdjacentHTML('afterbegin',
-        '로딩 중입니다. 처음에는 1~2분 걸릴 수 있어요. 조작법은 오른쪽 위 <b>도움말</b> 버튼 &middot; 메뉴는 <b>Tab</b>' +
+        '로딩 중입니다. 처음에는 1~2분 걸릴 수 있어요. 조작법은 아래쪽 <b>도움말</b> 버튼 &middot; 메뉴는 <b>Tab</b>' +
         (lowSpec ? ' &middot; 저사양 모드 켜짐 (고화질: 주소 끝에 <code>?q=high</code>)' : '') + '<br>');
     }
   });
