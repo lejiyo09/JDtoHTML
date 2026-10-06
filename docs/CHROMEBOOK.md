@@ -29,3 +29,6 @@ Low-spec mode uses `gMSAAValue` and `gAdvancedResolution.*` CVars; if the fork n
   If the game uses worker threads it cannot start cross-origin; use the Web Service below instead.
 - **Web Service** (`render.yaml`, `ports/soh/render_proxy/server.py`): same-origin proxy; safest option.
 - After changing `chromebook.js`, regenerate with `python ports/soh/make_static_front.py`.
+
+## 한국어 도움말
+오른쪽 위 "도움말" 버튼(처음 방문 시 안내 말풍선 포함)에 시작 방법, 조작법, 저장, 느릴 때, 문제 해결이 한국어로 들어 있습니다 (`ports/soh/chromebook.js`).
