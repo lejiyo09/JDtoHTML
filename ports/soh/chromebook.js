@@ -6,7 +6,8 @@
 //     Keyboard Lock API hands Esc to the game (hold Esc to leave fullscreen)
 //  4. fullscreen button (F11 / the Chromebook fullscreen key work too)
 //  5. mouse look: turns on the engine's own Free Look + mouse controls at boot; click mapping
-//  6. Korean help panel (controls, saving, performance, troubleshooting)
+//  6. offline: registers cr-sw.js, which keeps loaded files for offline use
+//  7. Korean help panel (controls, saving, performance, troubleshooting)
 (function () {
   var qs = new URLSearchParams(location.search);
   var ua = navigator.userAgent || '';
@@ -75,6 +76,17 @@
   function ready(fn) {
     if (document.body) fn(); else document.addEventListener('DOMContentLoaded', fn);
   }
+
+  // offline support (cr-sw.js must be served from the site root; a missing file is ignored)
+  try {
+    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+      navigator.serviceWorker.register('cr-sw.js').then(function () { return navigator.serviceWorker.ready; }).then(function () {
+        // save this page too (it was loaded before the worker controlled it)
+        if (navigator.serviceWorker.controller) fetch(location.href.split('#')[0]).catch(function () {});
+      }).catch(function () {});
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+    }
+  } catch (e) {}
 
   ready(function () {
     if (typeof WebAssembly !== 'object' || !webgl2ok()) {
@@ -188,6 +200,11 @@
       '<li>게임이 카메라를 고정하는 장소(일부 방, 상점 등)와 Z 조준 중에는 자유 시점이 동작하지 않습니다. 장면을 다시 불러와야 켜지는 경우도 있습니다.</li>' +
       '<li>마우스 시점 버튼을 끄거나 켜면 페이지가 새로고침됩니다.</li></ul>' +
 
+      '<h3>오프라인 사용</h3>' +
+      '<p>한 번 접속해서 게임이 뜬 뒤에는 게임 파일이 이 브라우저에 저장되어, <b>와이파이가 없어도</b> 같은 주소로 다시 열 수 있습니다. ' +
+      '처음 접속은 인터넷이 필요합니다. 저장 상태: <b id="cr-off-status">확인 중...</b></p>' +
+      '<p style="color:#9ab;font-size:13px">브라우저 데이터 삭제나 시크릿 모드에서는 저장이 사라집니다. 인터넷이 있을 때는 항상 최신 파일을 받습니다.</p>' +
+
       '<h3>3. 저장</h3>' +
       '<p>게임 안의 저장(올빼미 상, 메뉴의 저장)은 <b>이 브라우저 안</b>에 기록됩니다. ' +
       '<b>시크릿 모드</b>를 쓰거나 "사이트 데이터/쿠키 삭제"를 하면 저장이 사라지고, 다른 기기와 공유되지 않습니다. ' +
@@ -220,7 +237,19 @@
     panel.querySelectorAll('code').forEach(function (c) { c.style.cssText = 'background:#2a2a3c;padding:1px 5px;border-radius:4px'; });
     document.body.appendChild(panel);
 
-    function helpShow(on) { panel.style.display = on ? 'flex' : 'none'; if (!on) { try { window.focus(); } catch (e) {} } }
+    function offlineStatus() {
+      var el = document.getElementById('cr-off-status');
+      if (!el) return;
+      if (!window.caches) { el.textContent = '이 브라우저는 지원하지 않음'; return; }
+      caches.open('cr-offline-v1').then(function (c) { return c.keys(); }).then(function (keys) {
+        var u = keys.map(function (k) { return k.url; }).join('\n');
+        var need = [['soh.wasm', /soh\.wasm/], ['soh.js', /soh\.js/], ['soh.o2r', /soh\.o2r/], ['oot.o2r', /oot\.o2r/]];
+        var miss = need.filter(function (n) { return !n[1].test(u); }).map(function (n) { return n[0]; });
+        el.textContent = miss.length ? '아직 준비 안 됨 (없는 파일: ' + miss.join(', ') + ') - 게임이 뜰 때까지 접속해 두세요' : '준비됨 \u2705';
+        el.style.color = miss.length ? '#fc6' : '#7d7';
+      }).catch(function () { el.textContent = '확인 실패'; });
+    }
+    function helpShow(on) { if (on) offlineStatus(); panel.style.display = on ? 'flex' : 'none'; if (!on) { try { window.focus(); } catch (e) {} } }
     var helpBtn = document.createElement('button');
     helpBtn.textContent = '❓ 도움말';
     helpBtn.style.cssText = fsBtn.style.cssText;
