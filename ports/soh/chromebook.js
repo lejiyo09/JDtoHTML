@@ -77,20 +77,42 @@
     }
     document.addEventListener('fullscreenchange', lockKeys);
 
-    // Tab -> Escape (SoH menu). ChromeOS keeps Esc for leaving fullscreen.
-    var synth = false;
-    window.addEventListener('keydown', function (e) {
-      if (synth || e.code !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
-      var t = e.target;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-      e.preventDefault(); e.stopPropagation();
-      if (e.repeat) return;
+    // Extra keys that act as other keys (the game's default map is WASD + X/C/Z, which reads oddly:
+    // the key labelled "A" is "stick left"). Enter/J = A button (X), K/Backspace = B button (C), Tab = menu (Esc).
+    var ALIAS = {
+      Tab:       { key: 'Escape', code: 'Escape', keyCode: 27 },
+      Enter:     { key: 'x', code: 'KeyX', keyCode: 88 },
+      KeyJ:      { key: 'x', code: 'KeyX', keyCode: 88 },
+      KeyK:      { key: 'c', code: 'KeyC', keyCode: 67 },
+      Backspace: { key: 'c', code: 'KeyC', keyCode: 67 }
+    };
+    var synth = false, held = {};
+    function aliasEvent(type, a) {
+      var ev = new KeyboardEvent(type, { key: a.key, code: a.code, keyCode: a.keyCode, which: a.keyCode, bubbles: true, cancelable: true });
       synth = true;
-      var init = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
-      var dn = new KeyboardEvent('keydown', init);
-      var up = new KeyboardEvent('keyup', init);
-      (document.activeElement || document.body).dispatchEvent(dn);
-      setTimeout(function () { (document.activeElement || document.body).dispatchEvent(up); synth = false; }, 60);
+      try { (document.activeElement || document.body).dispatchEvent(ev); } finally { synth = false; }
+    }
+    function aliasFor(e) {
+      var a = ALIAS[e.code];
+      if (!a || synth || e.ctrlKey || e.altKey || e.metaKey) return null;
+      var t = e.target;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return null;   // typing a name: leave the keys alone
+      return a;
+    }
+    window.addEventListener('keydown', function (e) {
+      var a = aliasFor(e);
+      if (!a) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.repeat || held[e.code]) return;
+      held[e.code] = true;
+      aliasEvent('keydown', a);
+    }, true);
+    window.addEventListener('keyup', function (e) {
+      var a = ALIAS[e.code];
+      if (!a || synth || !held[e.code]) return;
+      e.preventDefault(); e.stopPropagation();
+      held[e.code] = false;
+      aliasEvent('keyup', a);
     }, true);
 
     // ---- 한국어 도움말 (아래쪽 "도움말" 버튼)
@@ -107,8 +129,9 @@
       '<h3>2. 조작법 (키보드)</h3>' +
       '<table style="border-collapse:collapse;width:100%">' +
       '<tr><td><b>W A S D</b></td><td>이동 (아날로그 스틱)</td></tr>' +
-      '<tr><td><b>X</b></td><td>A 버튼 (확인, 말 걸기, 구르기)</td></tr>' +
-      '<tr><td><b>C</b></td><td>B 버튼 (칼 휘두르기, 취소)</td></tr>' +
+      '<tr><td><b>X</b> 또는 <b>Enter</b>, <b>J</b></td><td>A 버튼 (확인, 말 걸기, 구르기)</td></tr>' +
+      '<tr><td><b>C</b> 또는 <b>K</b>, <b>Backspace</b></td><td>B 버튼 (칼 휘두르기, 취소)</td></tr>' +
+      '<tr><td colspan="2" style="color:#fc6">※ 키보드의 <b>A</b> 키는 게임의 A 버튼이 아니라 "왼쪽 이동"입니다. 확인은 <b>Enter</b> 또는 <b>X</b>를 쓰세요.</td></tr>' +
       '<tr><td><b>Z</b></td><td>Z 버튼 (적 조준 고정, 방패)</td></tr>' +
       '<tr><td><b>Space</b></td><td>Start (일시정지, 인벤토리)</td></tr>' +
       '<tr><td><b>방향키 ← ↑ → ↓</b></td><td>C 버튼 (아이템 사용)</td></tr>' +
