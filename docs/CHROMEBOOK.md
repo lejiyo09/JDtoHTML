@@ -33,9 +33,14 @@ Low-spec mode uses `gMSAAValue` and `gAdvancedResolution.*` CVars; if the fork n
 ## 한국어 도움말
 오른쪽 위 "도움말" 버튼(처음 방문 시 안내 말풍선 포함)에 시작 방법, 조작법, 저장, 느릴 때, 문제 해결이 한국어로 들어 있습니다 (`ports/soh/chromebook.js`).
 
-## 마우스 시점 (실험 기능, 기본 꺼짐)
-아래쪽 "마우스 시점" 버튼을 켜면 마우스 움직임이 가상 게임패드의 오른쪽 스틱 입력이 됩니다 (`window._crMouseLook`).
-켠 뒤 게임 화면을 클릭하면 마우스가 고정되고 Esc로 풀립니다. 카메라가 오른쪽 스틱을 받도록 게임 메뉴(Tab)에서 Free Look을 켜야 합니다.
-검증: 가짜 게임패드 생성, 마우스 이동 → 축 값, 정지 시 0 복귀, 끄면 제거까지 시험 페이지에서 확인. 실제 게임에서의 카메라 동작은 **미확인**.
-마우스 설정(⚙ 버튼): 감도 1~20 (기본 6), 상하 반전. 이 브라우저(localStorage `cr-mouselook`)에 저장됩니다.
-마우스가 고정된 동안: 왼쪽 클릭 = C 키(B 버튼), 오른쪽 클릭 = Z 키. 설정에 "출력 상한"(기본 30%)이 있어 가상 스틱이 게임의 C 버튼 판정 기준을 넘지 않게 낮춥니다 (기준값은 미확인).
+## 마우스 시점
+게임(Ship of Harkinian)에 내장된 마우스 조작을 사용합니다 (`soh/Enhancements/controls/Mouse.cpp`, `Camera_Free`).
+- 아래쪽 "마우스 시점"이 켜져 있으면(기본) 부팅 때 `gSettings.FreeLook.Enabled`, `gSettings.EnableMouse`, `gSettings.AutoCaptureMouse`를 켭니다.
+  `?ml=0` / `?ml=1`로 강제할 수 있고, `?dev=`를 직접 주면 건드리지 않습니다. 버튼으로 바꾸면 새로고침됩니다.
+- Free Look 상태에서 마우스가 움직이면 엔진이 자동 카메라를 끄고(`SetCameraManual`) 마우스로만 카메라를 움직입니다. 가상 게임패드는 쓰지 않습니다
+  (이전 방식은 오른쪽 스틱이 C 버튼으로 읽혀 Navi/도구/칼 오입력이 났습니다).
+- 감도와 반전은 게임 메뉴(Tab → Settings → Controls → Camera Controls)에서 바꿉니다.
+- 마우스가 고정된 동안 왼쪽 클릭 = C 키(B 버튼), 오른쪽 클릭 = Z 키 (마우스 설정에서 끌 수 있음).
+- 게임이 카메라를 고정하는 장소와 Z 조준 중에는 자유 시점이 동작하지 않습니다 (엔진 동작).
+- 저사양 모드의 설정 이름은 엔진 소스로 확인했습니다 (`gSettings.MSAAValue`, `gAdvancedResolution.*`).
+- 실제 게임에서의 동작은 이 세션에서 **미확인**입니다.
