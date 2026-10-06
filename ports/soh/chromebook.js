@@ -68,6 +68,11 @@
         ML.rx = clamp(ML.rx * 0.4 + ML.dx * (ML.sens / 100) * 0.6);
         ML.ry = clamp(ML.ry * 0.4 + ML.dy * (ML.sens / 100) * 0.6 * (ML.invY ? -1 : 1));
         ML.dx = 0; ML.dy = 0;
+        // axis lock: a mostly-horizontal (or vertical) move should not leak into the other axis
+        // (a stray upward component reads as C-up: first-person view / Navi)
+        var ax = Math.abs(ML.rx), ay = Math.abs(ML.ry);
+        if (ax > 3 * ay) ML.ry = 0; else if (ax > 2 * ay) ML.ry *= 0.3;
+        else if (ay > 3 * ax) ML.rx = 0; else if (ay > 2 * ax) ML.rx *= 0.3;
         var k = ML.cap / 100;      // keeps the virtual stick below the level the game reads as a C button
         ML.pad.axes = [0, 0, Math.abs(ML.rx) < 0.02 ? 0 : ML.rx * k, Math.abs(ML.ry) < 0.02 ? 0 : ML.ry * k];
         ML.pad.timestamp = performance.now();
