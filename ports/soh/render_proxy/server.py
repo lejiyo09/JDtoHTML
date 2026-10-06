@@ -17,6 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 UPSTREAM = os.environ.get("UPSTREAM", "https://andrewnakas.github.io/oot-cleanroom").rstrip("/")
 MARK = "/* cr-chromebook */"
 CB_JS = open(os.path.join(HERE, "..", "chromebook.js"), encoding="utf-8").read()
+SW_JS = open(os.path.join(HERE, "..", "cr-sw.js"), "rb").read()
 HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade",
        "proxy-authenticate", "proxy-authorization", "content-length", "content-encoding",
        "content-security-policy", "strict-transport-security", "set-cookie"}
@@ -58,6 +59,9 @@ class H(BaseHTTPRequestHandler):
     def go(self, head=False):
         if self.path == "/healthz":
             return self.out(200, [("Content-Type", "text/plain")], b"ok", head)
+        if self.path.split("?")[0] == "/cr-sw.js":
+            return self.out(200, [("Content-Type", "application/javascript; charset=utf-8"),
+                                  ("Cache-Control", "no-cache")], SW_JS, head)
         path = self.path if self.path.startswith("/") else "/" + self.path
         path = path.split("#")[0]
         hdr = {"Accept-Encoding": "identity", "User-Agent": "cr-front"}

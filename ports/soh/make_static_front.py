@@ -6,7 +6,8 @@ The page fetches the published site's index.html, adds a <base> pointing at it (
 the .o2r archives load from the original site), injects ports/soh/chromebook.js, and runs it.
 history.replaceState is wrapped because the site's boot script passes absolute paths, which would
 otherwise resolve against the <base> origin and throw. If anything fails the visitor is sent to the
-original site. ?upstream=<url> overrides the source (for testing).
+original site. It also registers cr-sw.js (written next to the page) so the game opens offline
+after one online visit. ?upstream=<url> overrides the source (for testing).
 """
 import json
 import os
@@ -28,7 +29,26 @@ PAGE = r"""<!doctype html>
   var CB = @CB@;
   var FIX = "(function(){var h=location.href;['replaceState','pushState'].forEach(function(n){var o=history[n];" +
             "history[n]=function(s,t,u){return o.call(history,s,t,u==null?u:new URL(u,h).href);};});})();";
-  fetch(UP + 'index.html', {cache: 'no-cache'}).then(function(r){
+  // offline support: register cr-sw.js and wait until it controls this page, so everything loaded below is saved
+  function whenControlled() {
+    return new Promise(function (res) {
+      if (!('serviceWorker' in navigator) || !/^https?:/.test(location.protocol)) return res();
+      var done = false, fin = function () { if (!done) { done = true; res(); } };
+      setTimeout(fin, 4000);                                   // never block the game on this
+      navigator.serviceWorker.register('cr-sw.js').then(function () {
+        if (navigator.serviceWorker.controller) return fin();
+        navigator.serviceWorker.addEventListener('controllerchange', fin);
+        return navigator.serviceWorker.ready;
+      }).catch(fin);
+    });
+  }
+  function savePage() {        // this page was loaded before the worker took over: fetch it again through the worker so it is saved too
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      var here = location.href.split('#')[0];
+      ['./', 'index.html', here].forEach(function (u) { fetch(u).catch(function () {}); });
+    }
+  }
+  whenControlled().then(function () { savePage(); return fetch(UP + 'index.html', {cache: 'no-cache'}); }).then(function(r){
     if(!r.ok) throw new Error(r.status); return r.text();
   }).then(function(s){
     if(s.indexOf('</head>') < 0) throw new Error('no head');
@@ -48,6 +68,8 @@ def main(argv):
     cb = open(os.path.join(HERE, "chromebook.js"), encoding="utf-8").read()
     html = PAGE.replace("@UPSTREAM@", json.dumps(up)).replace("@CB@", json.dumps(cb).replace("</", "<\\/"))
     open(out, "w", encoding="utf-8", newline="\n").write(html)
+    sw = os.path.join(os.path.dirname(os.path.abspath(out)), "cr-sw.js")
+    open(sw, "w", encoding="utf-8", newline="\n").write(open(os.path.join(HERE, "cr-sw.js"), encoding="utf-8").read())
     print("wrote", out, len(html), "bytes")
 
 

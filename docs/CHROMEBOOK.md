@@ -44,3 +44,10 @@ Low-spec mode uses `gMSAAValue` and `gAdvancedResolution.*` CVars; if the fork n
 - 게임이 카메라를 고정하는 장소와 Z 조준 중에는 자유 시점이 동작하지 않습니다 (엔진 동작).
 - 저사양 모드의 설정 이름은 엔진 소스로 확인했습니다 (`gSettings.MSAAValue`, `gAdvancedResolution.*`).
 - 실제 게임에서의 동작은 이 세션에서 **미확인**입니다.
+
+## 오프라인 사용
+- `ports/soh/cr-sw.js` (서비스 워커)가 페이지와 게임 파일(soh.js, soh.wasm, *.o2r)을 브라우저에 저장하고, 네트워크가 없으면 저장본을 줍니다. 인터넷이 있으면 항상 네트워크가 우선입니다.
+- 루트의 `index.html`(`make_static_front.py`)은 워커가 제어권을 잡을 때까지 기다린 뒤 게임을 불러오므로 첫 접속부터 저장됩니다. 워커 파일은 사이트 루트에 있어야 합니다 (`cr-sw.js`는 루트에 생성됨).
+- Web Service(`render_proxy`)는 `/cr-sw.js`를 직접 제공합니다. `patch_index.py`/`make_site.py`로 만든 사이트는 `cr-sw.js`를 같은 폴더에 직접 올려야 합니다.
+- 도움말의 "오프라인 사용"에서 저장 상태를 볼 수 있습니다 (soh.wasm, soh.js, soh.o2r, oot.o2r이 모두 있으면 준비됨).
+- 검증: 가짜 원본으로 첫 접속 → 오프라인 새로고침이 열리는 것까지 시험. 실제 게임(수십 MB 파일)에서는 **미확인**입니다.
