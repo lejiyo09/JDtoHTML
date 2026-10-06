@@ -51,7 +51,7 @@
     var fsBtn = document.createElement('button');
     fsBtn.textContent = '\u26F6 전체화면';
     fsBtn.title = '전체화면 (전체화면에서는 Esc를 길게 눌러 나갑니다)';
-    fsBtn.style.cssText = 'position:fixed;top:8px;right:8px;z-index:102;padding:6px 10px;border:1px solid #556;' +
+    fsBtn.style.cssText = 'padding:5px 10px;border:1px solid #556;' +
       'border-radius:6px;background:rgba(20,20,30,.75);color:#cde;font:13px sans-serif;cursor:pointer';
     fsBtn.addEventListener('click', function () {
       var el = document.documentElement;
@@ -59,7 +59,11 @@
       var p = el.requestFullscreen && el.requestFullscreen();
       if (p && p.catch) p.catch(function () {});
     });
-    document.body.appendChild(fsBtn);
+    // bottom centre: the game's own touch buttons (L, START, ESC, stick, A/B...) use the corners and the top edge
+    var bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:102;display:flex;gap:8px;opacity:.75';
+    bar.appendChild(fsBtn);
+    document.body.appendChild(bar);
 
     function lockKeys() {
       try {
@@ -89,7 +93,7 @@
       setTimeout(function () { (document.activeElement || document.body).dispatchEvent(up); synth = false; }, 60);
     }, true);
 
-    // ---- 한국어 도움말 (오른쪽 위 "도움말" 버튼)
+    // ---- 한국어 도움말 (아래쪽 "도움말" 버튼)
     var HELP = '' +
       '<h2 style="margin:0 0 4px">젤다의 전설: 시간의 오카리나 (웹 버전)</h2>' +
       '<p style="margin:0 0 12px;color:#9ab">ROM 없이 브라우저에서 바로 실행됩니다. 설치할 것이 없습니다.</p>' +
@@ -122,7 +126,7 @@
       '<ul><li>램 4GB 이하 기기는 <b>저사양 모드</b>(해상도 낮춤, 계단 보정 끔)가 자동으로 켜집니다. 수동으로 바꾸려면 주소 끝에 ' +
       '<code>?q=low</code>(저사양) 또는 <code>?q=high</code>(고화질)를 붙이세요.</li>' +
       '<li>다른 탭과 앱을 닫고, 충전기를 연결하세요. 배터리 절약 모드가 켜져 있으면 느려집니다.</li>' +
-      '<li>오른쪽 위 <b>전체화면</b> 버튼을 쓰면 조금 더 부드럽습니다. 전체화면에서 나올 때는 <b>Esc를 길게</b> 누르세요.</li></ul>' +
+      '<li>아래쪽 <b>전체화면</b> 버튼을 쓰면 조금 더 부드럽습니다. 전체화면에서 나올 때는 <b>Esc를 길게</b> 누르세요.</li></ul>' +
 
       '<h3>5. 문제 해결</h3>' +
       '<ul><li><b>화면이 계속 검거나 멈춤:</b> 2~3분 기다린 뒤 <b>F5</b>(새로고침 키)를 눌러 보세요.</li>' +
@@ -148,9 +152,9 @@
     function helpShow(on) { panel.style.display = on ? 'flex' : 'none'; if (!on) { try { window.focus(); } catch (e) {} } }
     var helpBtn = document.createElement('button');
     helpBtn.textContent = '❓ 도움말';
-    helpBtn.style.cssText = fsBtn.style.cssText.replace('right:8px', 'right:104px');
+    helpBtn.style.cssText = fsBtn.style.cssText;
     helpBtn.addEventListener('click', function () { helpShow(true); });
-    document.body.appendChild(helpBtn);
+    bar.insertBefore(helpBtn, fsBtn);
     panel.addEventListener('click', function (e) { if (e.target === panel || e.target.id === 'cr-help-close') helpShow(false); });
     window.addEventListener('keydown', function (e) {
       if (panel.style.display !== 'none') { e.stopPropagation(); if (e.code === 'Escape' || e.code === 'Tab') { e.preventDefault(); helpShow(false); } }
@@ -162,8 +166,8 @@
     try { seen = localStorage.getItem('cr-help-seen') === '1'; } catch (e) {}
     if (!seen) {
       var tip = document.createElement('div');
-      tip.textContent = '처음이신가요? 오른쪽 위 ❓ 도움말에서 조작법을 확인하세요.';
-      tip.style.cssText = 'position:fixed;top:48px;right:8px;z-index:102;max-width:260px;padding:8px 12px;border-radius:8px;' +
+      tip.textContent = '처음이신가요? 아래쪽 ❓ 도움말에서 조작법을 확인하세요.';
+      tip.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:102;max-width:300px;text-align:center;padding:8px 12px;border-radius:8px;' +
         'background:#fc6;color:#222;font:14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.5)';
       document.body.appendChild(tip);
       setTimeout(function () { tip.remove(); }, 7000);
@@ -175,7 +179,7 @@
     if (info && !info.dataset.cb) {
       info.dataset.cb = '1';
       info.insertAdjacentHTML('afterbegin',
-        '로딩 중입니다. 처음에는 1~2분 걸릴 수 있어요. 조작법은 오른쪽 위 <b>도움말</b> 버튼 &middot; 메뉴는 <b>Tab</b>' +
+        '로딩 중입니다. 처음에는 1~2분 걸릴 수 있어요. 조작법은 아래쪽 <b>도움말</b> 버튼 &middot; 메뉴는 <b>Tab</b>' +
         (lowSpec ? ' &middot; 저사양 모드 켜짐 (고화질: 주소 끝에 <code>?q=high</code>)' : '') + '<br>');
     }
   });
