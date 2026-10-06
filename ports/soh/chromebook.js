@@ -25,14 +25,15 @@
 
   // ---- Mouse look (experimental, off by default): the mouse drives a virtual gamepad's right stick.
   // Needs a camera that listens to the right stick (turn on Free Look in the game menu).
-  var ML = { on: false, pad: null, dx: 0, dy: 0, rx: 0, ry: 0, sens: 6, invY: false, cap: 30, onChange: null };
+  var ML = { on: false, pad: null, dx: 0, dy: 0, rx: 0, ry: 0, sens: 6, invY: false, cap: 30, clicks: true, onChange: null };
   try {
     var _sv = JSON.parse(localStorage.getItem('cr-mouselook') || '{}');
     if (_sv.sens >= 1 && _sv.sens <= 20) ML.sens = _sv.sens;
     ML.invY = !!_sv.invY;
     if (_sv.cap >= 10 && _sv.cap <= 100) ML.cap = _sv.cap;
+    if (_sv.clicks === false) ML.clicks = false;
   } catch (e) {}
-  ML.save = function () { try { localStorage.setItem('cr-mouselook', JSON.stringify({ sens: ML.sens, invY: ML.invY, cap: ML.cap })); } catch (e) {} };
+  ML.save = function () { try { localStorage.setItem('cr-mouselook', JSON.stringify({ sens: ML.sens, invY: ML.invY, cap: ML.cap, clicks: ML.clicks })); } catch (e) {} };
   window._crMouseLook = ML;
   (function () {
     var orig = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : function () { return []; };
@@ -106,7 +107,7 @@
     }
     document.addEventListener('mousedown', function (e) {
       var a = MB[e.button];
-      if (!ML.on || !a || !document.pointerLockElement) return;
+      if (!ML.on || !ML.clicks || !a || !document.pointerLockElement) return;
       e.preventDefault(); e.stopPropagation();
       if (mbHeld[e.button]) return;
       mbHeld[e.button] = true; mbKey('keydown', a);
@@ -126,6 +127,15 @@
       if (!t || t.tagName !== 'CANVAS') return;
       try { var r = t.requestPointerLock && t.requestPointerLock(); if (r && r.catch) r.catch(function () {}); } catch (x) {}
     }, true);
+    // While the mouse is captured, hide raw mouse/pointer events from the rest of the page. The game's touch
+    // buttons and menus read them, and a captured pointer sits still over the screen, so moving it could
+    // press on-screen buttons. (Registered after the handlers above, which still run.)
+    ['mousemove', 'pointermove', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'wheel'].forEach(function (t) {
+      document.addEventListener(t, function (e) {
+        if (ML.on && document.pointerLockElement) e.stopImmediatePropagation();
+      }, true);
+    });
+
   })();
 
   function webgl2ok() {
@@ -250,6 +260,7 @@
       '<h3>마우스 시점 (실험 기능)</h3>' +
       '<p>아래쪽 <b>마우스 시점</b> 버튼을 켜고 게임 화면을 클릭하면 마우스가 고정되고, 마우스를 움직이는 대로 오른쪽 스틱(카메라) 입력이 들어갑니다. ' +
       '마우스가 고정된 동안 <b>왼쪽 클릭 = C 키</b>(B 버튼), <b>오른쪽 클릭 = Z 키</b>로 동작합니다. ' +
+      '클릭 매핑은 마우스 설정에서 끌 수 있습니다. 마우스가 고정된 동안에는 마우스 움직임이 화면의 터치 버튼이나 메뉴로 전달되지 않습니다. ' +
       '시점을 돌릴 때 Navi가 반응하는 등 C 버튼이 눌리면 마우스 설정의 <b>출력 상한</b>을 낮추세요. ' +
       '<b>Esc</b>로 마우스를 풀 수 있습니다. <b>마우스 설정</b> 버튼에서 감도(1~20)와 상하 반전을 바꿀 수 있고 이 브라우저에 저장됩니다. 게임 설정 메뉴(<b>Tab</b>)에서 <b>자유 시점(Free Look)</b>을 켜야 카메라가 움직입니다. ' +
       '게임패드를 쓰는 경우 이 기능은 꺼 두세요.</p>' +
@@ -318,16 +329,19 @@
       '<label style="display:block;margin-top:8px">출력 상한: <b id="cr-cap-v"></b>% <span style="color:#9ab">(낮출수록 C 버튼 오작동이 줄고 카메라는 느려짐)</span>' +
       '<input id="cr-cap" type="range" min="10" max="100" step="5" style="width:100%"></label>' +
       '<label style="display:block;margin-top:8px"><input id="cr-invy" type="checkbox"> 상하 반전 (마우스를 위로 올리면 아래를 봄)</label>' +
+      '<label style="display:block;margin-top:8px"><input id="cr-clicks" type="checkbox"> 클릭 매핑 사용 (왼쪽 = C, 오른쪽 = Z)</label>' +
       '<div style="margin-top:10px;text-align:right"><button id="cr-set-reset" style="padding:4px 10px;margin-right:6px;border:1px solid #778;border-radius:6px;background:#2a2a3c;color:#eef;cursor:pointer">초기화</button>' +
       '<button id="cr-set-close" style="padding:4px 14px;border:1px solid #778;border-radius:6px;background:#2a2a3c;color:#eef;cursor:pointer">닫기</button></div>';
     document.body.appendChild(pop);
     var sensIn = pop.querySelector('#cr-sens'), sensV = pop.querySelector('#cr-sens-v'), invIn = pop.querySelector('#cr-invy');
     var capIn = pop.querySelector('#cr-cap'), capV = pop.querySelector('#cr-cap-v');
-    function popSync() { sensIn.value = ML.sens; sensV.textContent = ML.sens; invIn.checked = ML.invY; capIn.value = ML.cap; capV.textContent = ML.cap; }
+    var clkIn = pop.querySelector('#cr-clicks');
+    clkIn.addEventListener('change', function () { ML.clicks = clkIn.checked; ML.save(); });
+    function popSync() { sensIn.value = ML.sens; sensV.textContent = ML.sens; invIn.checked = ML.invY; capIn.value = ML.cap; capV.textContent = ML.cap; clkIn.checked = ML.clicks; }
     capIn.addEventListener('input', function () { ML.cap = +capIn.value; capV.textContent = ML.cap; ML.save(); });
     sensIn.addEventListener('input', function () { ML.sens = +sensIn.value; sensV.textContent = ML.sens; ML.save(); });
     invIn.addEventListener('change', function () { ML.invY = invIn.checked; ML.save(); });
-    pop.querySelector('#cr-set-reset').addEventListener('click', function () { ML.sens = 6; ML.invY = false; ML.cap = 30; ML.save(); popSync(); });
+    pop.querySelector('#cr-set-reset').addEventListener('click', function () { ML.sens = 6; ML.invY = false; ML.cap = 30; ML.clicks = true; ML.save(); popSync(); });
     function popShow(on) { pop.style.display = on ? 'block' : 'none'; if (on) popSync(); }
     pop.querySelector('#cr-set-close').addEventListener('click', function () { popShow(false); });
     setBtn.addEventListener('click', function () { popShow(pop.style.display === 'none'); setBtn.blur(); });
